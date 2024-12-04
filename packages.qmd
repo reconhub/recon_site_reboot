@@ -1,0 +1,127 @@
+---
+title: "Packages"
+---
+```{r}
+#| include: false
+library(httr2)
+library(purrr)
+library(dplyr)
+library(stringr)
+library(glue)
+
+
+print_pkgs <- function(p) {
+  walk(p, \(x) {
+    cat("::: {layout=\"[1,10]\" layout-valign=\"center\"}", "\n")
+    
+    
+    cat(x$logo, "\n\n")
+    cat(x$pkg, "[{{< fa brands github >}}](", x$github, ")", "\n")
+    cat(x$badge, "<br>")
+    cat(x$description, "<br>\n")
+    
+    cat(":::")
+    cat("\n\n")
+  })
+}
+
+find_logo <- function(url) {
+  o <- str_extract(url, "(?<=com/)[^/]+")
+  r <- str_extract(url, "[^/]+/?$")
+  b <- gh::gh("/repos/{owner}/{repo}/branches", owner = o, repo = r) |>
+    map_chr("name") |> 
+    str_subset("main$|master$")
+  f <- gh::gh("/repos/{owner}/{repo}/git/trees/{branch}", recursive = "true", 
+              owner = o, repo = r, branch = b) |>
+  pluck("tree") |>
+  map_chr("path")
+  
+  p <- str_subset(f, "((logo)|(hex)).*\\.[a-zA-Z]{3,4}$")
+  p_ext <- str_extract(p, "[a-zA-Z]{3,4}$") |> tolower()
+  p <- p[order(match(p_ext, c("png", "jpg", "svg")))][1]
+  
+  if(!is.na(p)) p <- glue("{url}/blob/{b}/{p}?raw=true")
+  p
+}
+```
+
+
+```{r}
+#| include: false
+#| cache: true
+pkgs_list <- c("https://reconhub.r-universe.dev/api/packages", 
+          "https://reconverse.r-universe.dev/api/packages") |>
+  setNames(nm = _) |>
+  map(\(x) {
+    request(x) |>
+      req_user_agent("RECON Website") |>
+      req_perform() |>
+      resp_body_json()
+  })
+```
+
+```{r}
+#| include: false
+pkgs <- do.call("c", pkgs_list) |>
+  map(\(x) x[c("Package", "Title", "Author", "Maintainer", "Description", "Version", "URL", "RemoteUrl")]) |>
+  map(as_tibble) |>
+  list_rbind(names_to = "universe") |>
+  rename_with(tolower) |>
+  rename(github = remoteurl) |>
+  mutate(across(c(url, description), \(x) str_replace_all(x, "\\n", " "))) |>
+  mutate(
+    url = map(url, \(x) str_split_1(x, ", ?") |> str_subset("github.com", negate = TRUE)),
+    url = map_chr(url, 1, .default = NA),
+    url = if_else(is.na(url), github, url),
+    maintainer = str_extract(maintainer, "\\w+"),
+    universe = str_extract(universe, "(?<=https://)[a-z]+(?=\\.)"),
+    logo_url = map_chr(github, find_logo),
+    logo_url = if_else(is.na(logo_url), "img/purple.png", logo_url),
+    logo = glue("[![]({logo_url}){{.pkg-logo}}]({url})"),  
+    pkg = glue("[{package}]({url})"),
+    description = str_remove_all(description, " \\(<?https://.[^ ]+\\.org/?>?\\)"),
+    description = str_remove_all(description, "This package is part .+ analysis\\."),
+    status = "stable",
+    badge = glue("![](img/badge-{status}.svg)")) |>
+  arrange(universe, package)
+```
+
+These are R packages developed as part of RECON or related to RECON.
+
+## Reconverse
+
+The *reconverse* aims to provide a coherent and composable suite of analytics tools for informing the response to disease outbreaks, health emergencies and humanitarian crises.
+
+We work hard to ensure packages within the reconverse fulfill three key goals:
+
+- Efficiency: Packages can be used in real time to improve situation awareness and inform intervention strategies.
+- Reliability: Packages are thoroughly and constantly tested using professional software development methods.
+- Accessibility: Packages are free, open-source, and available on virtually any platform; and can be used with different levels of expertise.
+
+```{r}
+#| echo: false
+#| results: asis
+
+p <- filter(pkgs, universe == "reconverse") |>
+  nest_by(package, .keep = TRUE) |>
+  pull(data)
+
+print_pkgs(p)
+```
+
+## Standard
+
+```{r}
+#| echo: false
+#| results: asis
+
+p <- filter(pkgs, universe == "reconhub") |>
+  nest_by(package, .keep = TRUE) |>
+  pull(data)
+
+print_pkgs(p)
+```
+
+## Related
+
+**TODO:** Need to identify these packages in an R-Universe.

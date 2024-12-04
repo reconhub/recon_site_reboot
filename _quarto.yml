@@ -1,0 +1,31 @@
+project:
+  type: website
+  render:
+    - "*.qmd"
+    - "*.md"
+    - "!CODE_DESIGN.md"
+
+website:
+  title: "R Epidemics Consortium"
+  open-graph: true
+  navbar:
+    right:
+      - packages.qmd
+      - resources.qmd
+      - about.qmd
+  page-footer:
+    center:
+      - icon: github
+        href: https://github.com/reconhub/recon_site_reboot
+      - "RECON - R Epidemics Consortium {{< meta date-modified >}}"
+
+format:
+  html:
+    title-block-style: none
+    theme:
+      - cosmo
+      - styles.scss
+    toc: true
+
+date-modified: last-modified
+date-format: iso
