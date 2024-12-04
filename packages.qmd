@@ -58,16 +58,19 @@ pkgs_list <- c("https://reconhub.r-universe.dev/api/packages",
       req_perform() |>
       resp_body_json()
   })
-```
 
-```{r}
-#| include: false
 pkgs <- do.call("c", pkgs_list) |>
   map(\(x) x[c("Package", "Title", "Author", "Maintainer", "Description", "Version", "URL", "RemoteUrl")]) |>
   map(as_tibble) |>
   list_rbind(names_to = "universe") |>
   rename_with(tolower) |>
   rename(github = remoteurl) |>
+  mutate(logo_url = map_chr(github, find_logo))
+```
+
+```{r}
+#| include: false
+pkgs <- pkgs |>
   mutate(across(c(url, description), \(x) str_replace_all(x, "\\n", " "))) |>
   mutate(
     url = map(url, \(x) str_split_1(x, ", ?") |> str_subset("github.com", negate = TRUE)),
@@ -75,7 +78,6 @@ pkgs <- do.call("c", pkgs_list) |>
     url = if_else(is.na(url), github, url),
     maintainer = str_extract(maintainer, "\\w+"),
     universe = str_extract(universe, "(?<=https://)[a-z]+(?=\\.)"),
-    logo_url = map_chr(github, find_logo),
     logo_url = if_else(is.na(logo_url), "img/purple.png", logo_url),
     logo = glue("[![]({logo_url}){{.pkg-logo}}]({url})"),  
     pkg = glue("[{package}]({url})"),
@@ -88,7 +90,44 @@ pkgs <- do.call("c", pkgs_list) |>
 
 These are R packages developed as part of RECON or related to RECON.
 
+## Standard
+
+Members of the [R Epidemics Consortium](https://www.repidemicsconsortium.org/)
+have, for many years, been creating resources and software that could be used
+to inform the response to disease outbreaks, health emergencies and
+humanitarian crises. During this time, as well as providing training materials,
+running workshops and having members deployed to the field to help with data
+analytics, a variety of [R](https://www.r-project.org/) packages have been
+created to enable analysts to quickly solve the problems they have.
+
+```{r}
+#| echo: false
+#| results: asis
+
+p <- filter(pkgs, universe == "reconhub") |>
+  nest_by(package, .keep = TRUE) |>
+  pull(data)
+
+print_pkgs(p)
+```
+
+
 ## Reconverse
+
+Since the early days of RECON,  the landscape of packages for the analysis of
+epidemics has grown, evolved and diversified, benefiting from feedback and
+contributions from our members as well as other groups. While such organic
+growth was needed and resulted in overall improvements of available tools, it
+has also led to a less consistent software landscape, with several packages
+overlapping or duplicating efforts, limited interoperability, and varying coding
+and development standards.  Being aware that fragmented software landscapes can
+be the bane of data scientists
+(e.g. [Excoffier and Heckel 2006](https://www.nature.com/articles/nrg1904), we
+realise there is also benefit to having a coherent and composable set of
+packages for users. The *reconverse* aims to address this. Much like the
+[tidyverse](https://www.tidyverse.org/) is "an opinionated collection of R
+packages designed for data science", the reconverse aims to be an opinionated
+ecosystem of packages for Outbreak Analytics.
 
 The *reconverse* aims to provide a coherent and composable suite of analytics tools for informing the response to disease outbreaks, health emergencies and humanitarian crises.
 
@@ -109,19 +148,39 @@ p <- filter(pkgs, universe == "reconverse") |>
 print_pkgs(p)
 ```
 
-## Standard
-
-```{r}
-#| echo: false
-#| results: asis
-
-p <- filter(pkgs, universe == "reconhub") |>
-  nest_by(package, .keep = TRUE) |>
-  pull(data)
-
-print_pkgs(p)
-```
 
 ## Related
 
 **TODO:** Need to identify these packages in an R-Universe.
+
+
+## Lifecycle
+
+When a user considers utilising a package in their work it is helpful to provide
+them with information on the development plans around the package. This allows
+them to make an informed decision as to whether they want to take that package
+as a dependency. To help users understand the development status of a package
+we use lifecycle badges to relay one of 4 stages of package maturity;
+[*concept*](#concept), [*experimental*](#experimental), [*maturing*](#maturing) and
+[*stable*](#stable):
+
+![](img/lifecycle_no_text.png){fig-alt="Diagram showing relationship between package maturity and time. Demonstrating how packages go through stages from concept to experimental to maturing to stable"}
+
+#### Concept ![](img/badge-concept.svg)
+Initial ideas of what the package will be, maybe some gist of code and
+discussions among developers, but not much more.
+
+#### Experimental ![](img/badge-experimental.svg)
+Draft of a functional package, but interfaces and functionalities may change
+over time, testing and documentation may be lacking. Typically semantic
+version < 0.1.0.
+
+#### Maturing ![](img/badge-maturing.svg)
+Package is functional, documented and tested. Can be used in production with the
+understanding that the interface may still undergo minor changes. Typically
+semantic version < 1.0.0.
+
+#### Stable ![](img/badge-stable.svg)
+Package is functional, documented and tested. The interface is not meant to
+change in the future. Can be used in production and relied upon by other
+packages. Typically semantic version >= 1.0.0.
