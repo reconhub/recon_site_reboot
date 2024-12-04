@@ -34,7 +34,10 @@ PhD student working in infectious disease modelling, contributor to RECON packag
 
 ## Contact
 
-If you would like to learn more or support our activities, 
+If you have questions regarding our [Packages](packages/) consider exploring
+the package documentation or opening issues in their GitHub repositories.
+
+For general inquiries or learn more about supporting our activities, 
 please get in touch by emailing [Noam Ross](mailto:noam@ropensci.org).
 
 
