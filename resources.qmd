@@ -1,0 +1,119 @@
+---
+title: "Resources"
+---
+
+```{r}
+#| include: false
+
+library(dplyr)
+library(stringr)
+library(purrr)
+library(glue)
+library(tidyr)
+```
+
+
+## Developing RECON packages
+
+If you are intersted in developing or contributing to RECON packages, we
+suggest you explore the [rOpenSci Software Peer Review process](https://ropensci.org/software-review/), 
+as well as the [rOpenSci Dev Guide](https://devguide.ropensci.org/) and
+[Epiverse Trace](https://epiverse-trace.github.io/).
+ 
+
+## Using RECON packages
+
+These resources are archived lectures, tutorials and case studies formerly hosted
+on **RECON Learn**. 
+
+These resources are not necessarily up-to-date with the 
+current package usage and some have errors or do not complile correctly, however, they still have value.
+
+HTML/pdf/pptx files are lecture slides, 
+while Rmd and md files are either tutorials or contain more details for lectures (regarding
+authorship etc.).
+
+```{r}
+#| include: false
+#| cache: true
+
+f <- gh::gh("/repos/{owner}/{repo}/git/trees/master", recursive = "true", 
+            owner = "reconhub", repo = "learn") |>
+  pluck("tree") |>
+  map_chr("path")
+
+ff <- tibble(path = str_subset(f, "post|slides")) |>
+  mutate(type = str_extract(path, "solutions|practical|lecture|slides"),
+         name = str_extract(path, "[^/]+(?=\\.)"),
+         ext = str_extract(path, "(md|Rmd|html|pdf|pptx)$"),
+         lang = str_extract(name, "spanish"),
+         lang = if_else(is.na(lang), "english", lang),
+         name = str_remove_all(name, glue("{type}-|-{lang}")),
+         name = str_replace_all(name, "-|_", " "),
+         name = str_to_title(name),
+         name = str_remove(name, "^\\d{1,2} "),
+         name = str_replace_all(
+           name, 
+           c("Vbd" = "VBD", "Ggplot2" = "ggplot2", "Tb" = "TB", "Intror" = "Intro to R",
+             "Basicvbd" = "Basic VBD")),
+         ext = factor(ext, levels = c("Rmd", "md", "html", "pdf", "pptx"))) |>
+  filter(!is.na(type), !is.na(ext), name != "Template") |>
+  filter(!(type == "lecture" & ext == "md"), 
+         !(type == "slides" & ext == "Rmd")) |>
+  mutate(url = case_when(
+    ext == "html" ~ glue("https://reconlearn.org/{str_remove(path, 'static/')}"),
+    .default = glue("https://github.com/reconhub/learn/blob/master/{path}")),
+    link = glue("[{ext}]({url}){{target=\"_blank\"}}")) |>
+  mutate(yaml = map2(url, ext, \(url, ext) {
+    if(ext == "Rmd") {
+      l <- readr::read_lines(glue("{url}?raw=true"), n_max = 30)
+      yml <- seq_len(str_which(l, "---")[2])
+      yml <- yaml::read_yaml(text = l[yml])
+        
+      nms <- str_subset(names(yml), "title|author")
+      if(sum(str_detect(nms, "author")) > 1) nms <- str_subset(nms, "title|authors")
+      yml <- yml[nms]
+      names(yml) <- str_replace(nms, "author$", "authors")
+      yml$authors <- glue_collapse(yml$authors, sep = ", ")
+      as_tibble(yml)
+    } else tibble(title = NA, authors = NA)
+  })) |>
+  tidyr::unnest(yaml) |>
+  arrange(name, title)
+         
+```
+
+
+```{r}
+#| echo: false
+#| results: asis
+text <- ff |>
+  filter(name != "Bag Of Slides") |>
+  mutate(#type2 = if_else(type %in% "slides", "lecture", type),
+         authors = replace_na(authors, ""), 
+         title = replace_na(title, "")) |>
+  #slice(17:21) |>
+  summarize(
+    authors = sort(authors, decreasing = TRUE)[1],
+    title =  sort(title, decreasing = TRUE)[1],
+    links = glue_collapse(link, sep = ", "),
+    by = glue("- {title} by {authors} "),
+    by = if_else(by == "-  by  ", "", by),
+    content = glue("{by}\n- {links}"),
+    .by = c("name", "lang")) |>
+  mutate(content = glue("**{name}**:\n\n{content}"))
+
+cat("### English\n\n")
+
+filter(text, lang == "english") |>
+  pull(content) |> 
+  cat(sep = "\n\n")
+
+cat("\n\n")
+cat("### Spanish\n\n")
+
+filter(text, lang == "spanish") |>
+  pull(content) |> 
+  cat(sep = "\n\n")
+```
+
